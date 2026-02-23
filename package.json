@@ -1,0 +1,11 @@
+{
+  "name": "gcal-scheduler",
+  "version": "1.0.0",
+  "description": "Quickly create Google Calendar events from natural language.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "author": "Max Timkovich",
+  "license": "MIT"
+}
