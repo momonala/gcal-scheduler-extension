@@ -7,6 +7,7 @@ const MESSAGE_EXTRACT = 'EXTRACT_AND_OPEN';
 function notify(message) {
   chrome.notifications?.create({
     type: 'basic',
+    iconUrl: 'images/icon_128.png',
     title: 'gcal-scheduler',
     message: String(message).slice(0, 200),
   });

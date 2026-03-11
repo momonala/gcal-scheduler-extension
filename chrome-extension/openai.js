@@ -12,16 +12,21 @@ const EXTRACT_SCHEMA = {
       start: { type: 'string', description: 'Start date-time in ISO 8601' },
       end: { type: 'string', description: 'End date-time in ISO 8601' },
       is_all_day: { type: 'boolean', description: 'True if no specific time' },
+      location: { type: 'string', description: 'Event location, if mentioned' },
+      notes: { type: 'string', description: 'Additional notes or details, if mentioned' },
     },
-    required: ['title', 'start', 'end', 'is_all_day'],
+    required: ['title', 'start', 'end', 'is_all_day', 'location', 'notes'],
     additionalProperties: false,
   },
 };
 
 const SYSTEM_MESSAGE = `Extract a single calendar event from the user's natural language input.
-Return JSON with: title (string), start (ISO 8601), end (ISO 8601), is_all_day (boolean).
-The title must start with a single descriptive emoji (e.g. 🍽️ Dinner with Sarah, 📅 Team standup).
+Return JSON with: title (string), start (ISO 8601), end (ISO 8601), is_all_day (boolean), location (string), and notes (string).
+The title must start with a single descriptive emoji (e.g. 🍽️ Dinner with Sarah, 📅 Team standup). If the emoji supports skin tone variants, use the second darkest skin tone (🏾).
+The location must be only the venue address (e.g. "Karl-Marx-Straße 275-277, 12057 Berlin") and must NOT repeat the event or business name.
+Put any extra descriptive text (class names, business names, etc.) into the title or notes, not into location.
 For all-day events use date-only ISO (e.g. 2026-02-24). For timed events use full ISO (e.g. 2026-02-24T19:00:00).
+If no location or notes are implied, still include those fields as empty strings.
 If no end is implied, use 1 hour after start for timed events, or 1 day after start for all-day events.`;
 
 function pad(n) {
@@ -58,15 +63,31 @@ function isoToGoogleDates(startIso, endIso, isAllDay) {
 
 /**
  * Maps raw API response to our calendar event model.
- * @param {{ title: string, start: string, end: string, is_all_day: boolean }} raw
+ * @param {{ title: string, start: string, end: string, is_all_day: boolean, location?: string, notes?: string }} raw
  * @returns {import('./eventModel.js').CalendarEvent}
  */
 function rawToEvent(raw) {
   const dates = isoToGoogleDates(raw.start, raw.end, raw.is_all_day);
+
+  const title = String(raw.title || '').trim();
+
+  let location = raw.location ? String(raw.location).trim() : '';
+  if (location) {
+    const titleHead = title.split(',')[0].trim().toLowerCase();
+    const [firstSegment, ...rest] = location.split(',');
+    if (rest.length && titleHead && firstSegment.trim().toLowerCase().includes(titleHead)) {
+      location = rest.join(',').trim();
+    }
+  }
+
+  const notes = raw.notes ? String(raw.notes).trim() : '';
+
   const event = {
-    title: String(raw.title || '').trim(),
+    title,
     dates,
     isAllDay: Boolean(raw.is_all_day),
+    location: location || undefined,
+    notes: notes || undefined,
   };
   validateEvent(event);
   return event;

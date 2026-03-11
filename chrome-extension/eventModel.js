@@ -1,6 +1,6 @@
 /**
  * Calendar event data model: single source of truth for Google Calendar URL payload.
- * @typedef {{ title: string, dates: string, isAllDay?: boolean }} CalendarEvent
+ * @typedef {{ title: string, dates: string, isAllDay?: boolean, location?: string, notes?: string }} CalendarEvent
  */
 
 const DATES_ALL_DAY = /^\d{8}\/\d{8}$/;
@@ -45,6 +45,15 @@ export function eventToCalendarUrl(event) {
     text: event.title.trim(),
     dates: event.dates,
   });
+
+  if (event.location && event.location.trim()) {
+    params.set('location', event.location.trim());
+  }
+
+  if (event.notes && event.notes.trim()) {
+    params.set('details', event.notes.trim());
+  }
+
   return `${baseUrl}?${params}`;
 }
 
@@ -53,5 +62,11 @@ export function eventToCalendarUrl(event) {
  * @param {CalendarEvent} event
  */
 export function logEvent(event) {
-  console.log('[calendar event]', { title: event.title, dates: event.dates, isAllDay: event.isAllDay });
+  console.log('[calendar event]', {
+    title: event.title,
+    dates: event.dates,
+    isAllDay: event.isAllDay,
+    location: event.location,
+    notes: event.notes,
+  });
 }
