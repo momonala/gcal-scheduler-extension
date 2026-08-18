@@ -22,7 +22,7 @@ const EXTRACT_SCHEMA = {
 
 const SYSTEM_MESSAGE = `Extract a single calendar event from the user's natural language input.
 Return JSON with: title (string), start (ISO 8601), end (ISO 8601), is_all_day (boolean), location (string), and notes (string).
-The title must start with a single descriptive emoji (e.g. 🍽️ Dinner with Sarah, 📅 Team standup). If the emoji supports skin tone variants, use the second darkest skin tone (🏾).
+The title must start with a single descriptive emoji (e.g. 🍽️ Dinner with Sarah, 📅 Team standup). If the emoji supports skin tone variants, use the third darkest skin tone (🏽).
 The location must be only the venue address (e.g. "Karl-Marx-Straße 275-277, 12057 Berlin") and must NOT repeat the event or business name.
 Put any extra descriptive text (class names, business names, etc.) into the title or notes, not into location.
 For all-day events use date-only ISO (e.g. 2026-02-24). For timed events use full ISO (e.g. 2026-02-24T19:00:00).
