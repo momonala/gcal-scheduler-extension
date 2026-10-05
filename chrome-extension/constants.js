@@ -1,5 +1,3 @@
-/** Default OpenAI model when none is selected. */
-export const DEFAULT_MODEL = 'gpt-5.2';
+export const MODEL = 'claude-sonnet-5-5';
 
-/** Default values for chrome.storage.sync.get(). */
-export const STORAGE_DEFAULTS = { apiKey: '', model: DEFAULT_MODEL };
+export const NATIVE_HOST = 'com.gcal_scheduler.claude';

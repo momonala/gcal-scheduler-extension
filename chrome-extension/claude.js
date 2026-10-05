@@ -1,23 +1,18 @@
 import { validateEvent } from './eventModel.js';
-
-const OPENAI_BASE = 'https://api.openai.com/v1';
+import { MODEL, NATIVE_HOST } from './constants.js';
 
 const EXTRACT_SCHEMA = {
-  name: 'calendar_event',
-  strict: true,
-  schema: {
-    type: 'object',
-    properties: {
-      title: { type: 'string', description: 'Event title starting with a single descriptive emoji' },
-      start: { type: 'string', description: 'Start date-time in ISO 8601' },
-      end: { type: 'string', description: 'End date-time in ISO 8601' },
-      is_all_day: { type: 'boolean', description: 'True if no specific time' },
-      location: { type: 'string', description: 'Event location, if mentioned' },
-      notes: { type: 'string', description: 'Additional notes or details, if mentioned' },
-    },
-    required: ['title', 'start', 'end', 'is_all_day', 'location', 'notes'],
-    additionalProperties: false,
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'Event title starting with a single descriptive emoji' },
+    start: { type: 'string', description: 'Start date-time in ISO 8601' },
+    end: { type: 'string', description: 'End date-time in ISO 8601' },
+    is_all_day: { type: 'boolean', description: 'True if no specific time' },
+    location: { type: 'string', description: 'Event location, if mentioned' },
+    notes: { type: 'string', description: 'Additional notes or details, if mentioned' },
   },
+  required: ['title', 'start', 'end', 'is_all_day', 'location', 'notes'],
+  additionalProperties: false,
 };
 
 const SYSTEM_MESSAGE = `Extract a single calendar event from the user's natural language input.
@@ -94,90 +89,35 @@ function rawToEvent(raw) {
 }
 
 /**
- * Fetches list of models from OpenAI.
- * @param {string} apiKey
- * @returns {Promise<{ id: string }[]>}
- */
-export async function listModels(apiKey) {
-  if (!apiKey || !apiKey.trim()) {
-    throw new Error('OpenAI API key is required');
-  }
-  const res = await fetch(`${OPENAI_BASE}/models`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${apiKey.trim()}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`OpenAI models request failed: ${res.status} ${body || res.statusText}`);
-  }
-  const data = await res.json();
-  const list = data.data;
-  if (!Array.isArray(list)) {
-    throw new Error('OpenAI models response missing data array');
-  }
-  return list.map((m) => ({ id: m.id }));
-}
-
-/**
- * Extracts a calendar event from natural language using OpenAI Chat Completions.
- * @param {string} apiKey
- * @param {string} model
+ * Extracts a calendar event from natural language via the local Claude Code native host.
  * @param {string} text
  * @returns {Promise<import('./eventModel.js').CalendarEvent>}
  */
-export async function extractCalendarEvent(apiKey, model, text) {
-  if (!apiKey || !apiKey.trim()) {
-    throw new Error('OpenAI API key is required');
-  }
-  if (!model || !model.trim()) {
-    throw new Error('Model is required');
-  }
+export async function extractCalendarEvent(text) {
   if (!text || !String(text).trim()) {
     throw new Error('Input text is required');
   }
 
-  const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey.trim()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: model.trim(),
-      messages: [
-        { role: 'system', content: SYSTEM_MESSAGE },
-        { role: 'user', content: String(text).trim() },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: EXTRACT_SCHEMA,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`OpenAI completion failed: ${res.status} ${body || res.statusText}`);
-  }
-
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (content == null || content === '') {
-    throw new Error('OpenAI returned empty content');
-  }
-
-  let raw;
+  let response;
   try {
-    raw = JSON.parse(content);
-  } catch {
-    throw new Error('OpenAI response was not valid JSON');
+    response = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+      model: MODEL,
+      system: `${SYSTEM_MESSAGE}\nThe current local date and time is ${new Date().toString()}.`,
+      schema: EXTRACT_SCHEMA,
+      text: String(text).trim(),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Claude host unavailable (${message}). Run native-host/install.sh.`);
   }
 
+  if (!response?.ok) {
+    throw new Error(`Claude extraction failed: ${response?.error || 'no response'}`);
+  }
+
+  const raw = response.event;
   if (!raw || typeof raw.title !== 'string' || typeof raw.start !== 'string' || typeof raw.end !== 'string') {
-    throw new Error('OpenAI response missing required fields: title, start, end');
+    throw new Error('Claude response missing required fields: title, start, end');
   }
 
   return rawToEvent(raw);

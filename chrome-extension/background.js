@@ -1,6 +1,5 @@
-import { extractCalendarEvent } from './openai.js';
+import { extractCalendarEvent } from './claude.js';
 import { eventToCalendarUrl, logEvent } from './eventModel.js';
-import { DEFAULT_MODEL, STORAGE_DEFAULTS } from './constants.js';
 
 const MESSAGE_EXTRACT = 'EXTRACT_AND_OPEN';
 
@@ -13,8 +12,8 @@ function notify(message) {
   });
 }
 
-async function extractAndOpen(text, apiKey, model) {
-  const event = await extractCalendarEvent(apiKey, model, text);
+async function extractAndOpen(text) {
+  const event = await extractCalendarEvent(text);
   logEvent(event);
   const url = eventToCalendarUrl(event);
   chrome.tabs.create({ url });
@@ -22,26 +21,14 @@ async function extractAndOpen(text, apiKey, model) {
 }
 
 async function handleExtractMessage(msg, sendResponse) {
-  const { text, model: msgModel } = msg;
-  const storage = await chrome.storage.sync.get(STORAGE_DEFAULTS);
-  const apiKey = (msg.apiKey ?? storage.apiKey) || '';
-  const model = msgModel || storage.model || DEFAULT_MODEL;
-
-  if (!apiKey.trim()) {
-    sendResponse({ success: false, error: 'Set your OpenAI API key in the extension popup.' });
-    return;
-  }
-  if (!model.trim()) {
-    sendResponse({ success: false, error: 'Select a model in the extension popup.' });
-    return;
-  }
+  const { text } = msg;
   if (!text || !String(text).trim()) {
     sendResponse({ success: false, error: 'Enter event text.' });
     return;
   }
 
   try {
-    const result = await extractAndOpen(text, apiKey, model);
+    const result = await extractAndOpen(text);
     sendResponse(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -67,16 +54,8 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   const text = info.selectionText?.trim() || '';
   if (!text) return;
 
-  const storage = await chrome.storage.sync.get(STORAGE_DEFAULTS);
-  const model = storage.model?.trim() || DEFAULT_MODEL;
-
-  if (!storage.apiKey?.trim()) {
-    notify('Set your OpenAI API key in the extension popup.');
-    return;
-  }
-
   try {
-    await extractAndOpen(text, storage.apiKey, model);
+    await extractAndOpen(text);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     notify(message);
